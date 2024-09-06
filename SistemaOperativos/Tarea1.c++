@@ -5,62 +5,64 @@
 #include <sys/shm.h>
 #include <sys/shm.h>
 #include <fcntl.h>
-#include <cstlib>
+#include <cstdlib>
 #include <iostream>
+#include <sys/stat.h>
 
 using namespace std;
 
 int main(){
-    cout<<"proceso Origen:" << getpid() << endl;
-    cout<<"Ingrese cantidad de jugadores: ";
-    int cant_jugadores;
-    cin >> cant_jugadores;
-    int id_jugadores [cant_jugadores];
+    printf("Proceso Origen: %d\n", getpid());
+    printf("Ingrese cantidad de jugadores: ");
+    fflush(stdout);
 
-    //<---------- Creacion de la variable compartida -------------->
-    //esta variable count va a ser la misma en cualquier parte del codigo independientemente de que proceso este.
-    key_t key = ftok("shmfile", 65);
-    int shmid = shmget(key, sizeof(int), 0666|IPC_CREAT);
-    int *count = (int*) shmat(shmid, (void*)0, 0);
-    *count = 0;
+    int cant_jugadores;
+    scanf("%d", &cant_jugadores);
+    int id_jugadores [cant_jugadores];
 
     //<-------------- Creacion de los named pipes -------------->
     int fd;
-    if(mkfifo("/temp/mi_fifo", 0666) == -1){
-        perror("mkfifo");
+
+    if(mkfifo("./mi_fifo", 0666) == -1){
+        perror("./mkfifo");
         exit(-1);
     }
 
     //<--------creacion de los hijos------------>
     for(int i = 0; i < cant_jugadores; i++){
         if(fork() == 0){
+            printf("Proceso hijo %d: %d\n", i, getpid());
+            fflush(stdout);
             int id = i;
-            cout << "proceso hijo" << id << ": " << getpid() << endl;
-            fd = open("/temp/mi_fifo", O_RDWR);
+            //<------- creacion de pipes con proceso observador ---------->
+            fd = open("./mi_fifo", O_RDWR);
             if(fd == -1){
                 perror("fd");
                 exit(-1);
             }
+            //<---------- procesos de votacion ------------->
+            int jugadores[cant_jugadores];
 
             int voto;
-            int finalizado;
+            int finalizado = -1;
+            while(finalizado != id){
+                do {
+                    voto = rand()%cant_jugadores;
+                }while(voto == id && jugadores[voto] == 1);
 
-            do {
-                voto = rand()%10;
-            }while(voto == id);
-            ssize_t bytes_written = write(fd, &voto, sizeof(voto));
-            sleep(2);
-            ssize_t bytes_read = read(fd, &finalizado, sizeof(finalizado));
+                printf("Jugador %d votó por: %d\n", id, voto);
+                fflush(stdout);
 
-
+                write(fd, &voto, sizeof(voto)); //mandar voto
+                sleep(2);
+                read(fd, &finalizado, sizeof(finalizado));//recivir resultado
+                jugadores[finalizado] = 1;
+            }
+            printf("Jugador %d amurrado\n", i);
+            fflush(stdout);
+            close(fd);
             exit(0);
         }
-    }
-
-    //<-------Espera a que los hijos se creen para que el observador se cree ------------>
-    for(int i = 0; i < cant_jugadores + 1; i++){
-        int status;
-        wait(&status);
     }
 
     //<----------proceso de creacion del proceso observador ---------------_>
@@ -68,16 +70,56 @@ int main(){
     if(pid > 0){
         pid_t observador = fork();
         if(observador == 0){
-            cout << "proceso observador: " << getpid() << endl;
-            fd = open("/temp/mi_fifo", O_RDWR);
+            printf("Proceso observador: %d\n", getpid());
+            fflush(stdout);
+            // <---------- creacion de pipes con procesos jugadores -------->
+            fd = open("./mi_fifo", O_RDWR);
             if(fd == -1){
                 perror("fd");
                 exit(-1);
             }
-            
 
+            int id_jugadores[cant_jugadores];
+            int jugador_sel;
+            
+            while(cant_jugadores != 1){
+                //recopilar los votos de los jugadores
+                for(int i = 0; i < cant_jugadores; i++){
+                    read(fd, &jugador_sel, sizeof(jugador_sel));
+                    id_jugadores[jugador_sel] += 1;
+                }
+
+                //conseguir el id mas grande
+                int mayor = 0;
+                int id_mayor;
+                for(int i = 0; i < cant_jugadores; i++){
+                    if(id_jugadores[i] > mayor){
+                        mayor = id_jugadores[i];
+                        id_mayor = i;
+                    }
+                }
+
+                //enviar el id mas grande al observador
+                write(fd, &id_mayor, sizeof(id_mayor));
+                printf("Jugador más votado: %d\n", id_mayor);
+                fflush(stdout);
+
+                //limpiar el arreglo de votos
+                for(int i = 0; i < cant_jugadores; i++){
+                    id_jugadores[i] = 0;
+                }
+
+                cant_jugadores -= 1;
+            }
+
+
+            printf("Juego terminado.\n");
+            fflush(stdout);
+            close(fd);
             exit(0);
         }
     }
+
+    unlink("./mi_fifo");
     return 0;
 }
