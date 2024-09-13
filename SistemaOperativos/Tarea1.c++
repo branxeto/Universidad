@@ -76,6 +76,20 @@ int main() {
                     read(fd, &finalizado, sizeof(finalizado)); // Recibir resultado (paso 3)
                     sleep(3);
                     jugadores[finalizado] = 1;
+                    int juego_terminado = 0;
+                    for(int j = 0; j < cant_jugadores; j++){
+                        if(jugadores[i]==id){
+                            continue;
+                        } else if(jugadores[i]== 1){
+                            juego_terminado = 1;
+                        } else if(jugadores[i] == 0){
+                            juego_terminado = 0;
+                        }
+                    }
+                    if(juego_terminado = 1){
+                        break;
+                    }
+
                 }
 
                 printf("Jugador %d amurrado\n", i);
@@ -142,6 +156,12 @@ int main() {
                 // Limpiar el arreglo de votos
                 for (int i = 0; i < cant_jugadores; i++) {
                     id_jugadores[i] = 0;
+                }
+
+                //Juego Terminado
+                if(cant_jugadores-1 == 1){
+                    int juego_terminado = 1;
+                    write(fd, &juego_terminado, sizeof(juego_terminado));
                 }
 
                 cant_jugadores -= 1;
