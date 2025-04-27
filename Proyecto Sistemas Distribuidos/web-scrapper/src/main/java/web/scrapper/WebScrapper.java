@@ -11,8 +11,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.bson.Document;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.MongoClient;
@@ -22,7 +20,6 @@ import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.result.InsertOneResult;
 
 public class WebScrapper {
-    private static final Logger logger = LoggerFactory.getLogger(WebScrapper.class);
     public static void main(String[] args) throws Exception {
         
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
@@ -75,7 +72,7 @@ public class WebScrapper {
             Document doc = Document.parse(eventoString); 
             if (doc != null) {
                 InsertOneResult result = collection.insertOne(doc);
-                logger.info("Documento insertado con ID: " + result.getInsertedId());
+                System.out.println("Documento insertado con ID: " + result.getInsertedId());
             } else {
                 System.out.println("Hubo un error en la obtención del JSON.");
             }
